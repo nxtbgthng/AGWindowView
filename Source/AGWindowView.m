@@ -116,6 +116,9 @@ static NSMutableArray *_activeWindowViews;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(statusBarFrameOrOrientationChanged:) name:UIApplicationDidChangeStatusBarOrientationNotification object:nil];
     
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(statusBarFrameOrOrientationChanged:) name:UIApplicationDidChangeStatusBarFrameNotification object:nil];
+    
+    [[UIDevice currentDevice] beginGeneratingDeviceOrientationNotifications];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(deviceOrientationChanged:) name:UIDeviceOrientationDidChangeNotification object:nil];
 }
 
 - (void)setSupportedInterfaceOrientations:(AGInterfaceOrientationMask)supportedInterfaceOrientations
@@ -124,7 +127,7 @@ static NSMutableArray *_activeWindowViews;
     
     if(self.window != nil)
     {
-        [self rotateAccordingToStatusBarOrientationAndSupportedOrientations];
+        [self rotateAccordingToStatusBarOrientationAndSupportedOrientations:YES];
     }
 }
 
@@ -134,11 +137,22 @@ static NSMutableArray *_activeWindowViews;
      This notification is most likely triggered inside an animation block,
      therefore no animation is needed to perform this nice transition.
      */
-    [self rotateAccordingToStatusBarOrientationAndSupportedOrientations];
+    [self rotateAccordingToStatusBarOrientationAndSupportedOrientations:NO];
 }
 
-- (void)rotateAccordingToStatusBarOrientationAndSupportedOrientations
+- (void)deviceOrientationChanged:(NSNotification *)notification;
 {
+    [UIView animateWithDuration:[[UIApplication sharedApplication] statusBarOrientationAnimationDuration] animations:^{
+        [self rotateAccordingToStatusBarOrientationAndSupportedOrientations:NO];
+    }];
+}
+
+- (void)rotateAccordingToStatusBarOrientationAndSupportedOrientations:(BOOL)forceSettingFrame
+{
+    if ([self isDesiredOrientationSupported] == NO && !forceSettingFrame) {
+        //if we can't rotate to where we want to, just don't rotate and stay where we are
+        return;
+    }
     UIInterfaceOrientation orientation = [self desiredOrientation];
     CGFloat angle = UIInterfaceOrientationAngleOfOrientation(orientation);
     CGFloat statusBarHeight = [[self class] getStatusBarHeight];
@@ -185,16 +199,31 @@ static NSMutableArray *_activeWindowViews;
     return frame;
 }
 
+- (BOOL)isDesiredOrientationSupported
+{
+    UIInterfaceOrientation statusBarOrientation = [[UIApplication sharedApplication] statusBarOrientation];
+    UIDeviceOrientation deviceOrientation = [[UIDevice currentDevice] orientation];
+    
+    UIInterfaceOrientation orientation = UIInterfaceOrientationFromDeviceOrientation(deviceOrientation, statusBarOrientation);
+    return self.supportedInterfaceOrientations & AGInterfaceOrientationMaskFromOrientation(orientation);
+}
+
 - (UIInterfaceOrientation)desiredOrientation
 {
     UIInterfaceOrientation statusBarOrientation = [[UIApplication sharedApplication] statusBarOrientation];
-    AGInterfaceOrientationMask statusBarOrientationAsMask = AGInterfaceOrientationMaskFromOrientation(statusBarOrientation);
+    UIDeviceOrientation deviceOrientation = [[UIDevice currentDevice] orientation];
+
+    UIInterfaceOrientation orientation = UIInterfaceOrientationFromDeviceOrientation(deviceOrientation, statusBarOrientation);
+    
+    
+    AGInterfaceOrientationMask statusBarOrientationAsMask = AGInterfaceOrientationMaskFromOrientation(orientation);
     if(self.supportedInterfaceOrientations & statusBarOrientationAsMask)
     {
-        return statusBarOrientation;
+        return orientation;
     }
     else
     {
+        // return some sensible defaults
         if(self.supportedInterfaceOrientations & AGInterfaceOrientationMaskPortrait)
         {
             return UIInterfaceOrientationPortrait;
@@ -230,7 +259,7 @@ static NSMutableArray *_activeWindowViews;
         [self assertCorrectHirearchy];
         self.onDidMoveToWindow ? self.onDidMoveToWindow() : nil;
         [_activeWindowViews addObject:self];
-        [self rotateAccordingToStatusBarOrientationAndSupportedOrientations];
+        [self rotateAccordingToStatusBarOrientationAndSupportedOrientations:YES];
     }
 }
 
@@ -442,6 +471,14 @@ CGFloat UIInterfaceOrientationAngleOfOrientation(UIInterfaceOrientation orientat
 AGInterfaceOrientationMask AGInterfaceOrientationMaskFromOrientation(UIInterfaceOrientation orientation)
 {
     return 1 << orientation;
+}
+
+UIInterfaceOrientation UIInterfaceOrientationFromDeviceOrientation(UIDeviceOrientation deviceOrientation, UIInterfaceOrientation defaultOrientation)
+{
+    if (UIDeviceOrientationIsValidInterfaceOrientation(deviceOrientation) == NO) {
+        return defaultOrientation;
+    }
+    return (UIInterfaceOrientation)deviceOrientation;
 }
 
 @end

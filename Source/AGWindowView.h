@@ -66,5 +66,6 @@ BOOL UIInterfaceOrientationsIsForSameAxis(UIInterfaceOrientation o1, UIInterface
 CGFloat UIInterfaceOrientationAngleBetween(UIInterfaceOrientation o1, UIInterfaceOrientation o2);
 CGFloat UIInterfaceOrientationAngleOfOrientation(UIInterfaceOrientation orientation);
 AGInterfaceOrientationMask AGInterfaceOrientationMaskFromOrientation(UIInterfaceOrientation orientation);
+UIInterfaceOrientation UIInterfaceOrientationFromDeviceOrientation(UIDeviceOrientation deviceOrientation, UIInterfaceOrientation defaultOrientation);
 
 @end
